@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>日·记</title>
-  <!-- 引入 html2canvas 用于截图保存 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     * {
@@ -22,7 +21,6 @@
       margin: 0 auto;
     }
 
-    /* 顶部标题 */
     .header {
       text-align: center;
       margin-bottom: 50px;
@@ -34,7 +32,7 @@
       color: #1a1a1a;
     }
 
-    /* 按钮区域 */
+    /* 工具栏按钮区 */
     .actions {
       display: flex;
       justify-content: center;
@@ -58,12 +56,10 @@
       border-color: #aaa;
     }
 
-    /* 时间线容器 */
     .timeline {
       position: relative;
       padding-left: 30px;
     }
-    /* 时间线中间的竖线 */
     .timeline::before {
       content: "";
       position: absolute;
@@ -74,13 +70,11 @@
       background: #e0e0e0;
     }
 
-    /* 每条日记 */
     .entry {
       position: relative;
       margin-bottom: 32px;
       padding-left: 20px;
     }
-    /* 时间线上的圆点 */
     .entry::before {
       content: "";
       position: absolute;
@@ -104,6 +98,7 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
+    /* 编辑、删除按钮，截图时需要隐藏 */
     .entry-tools {
       margin-top: 6px;
       display: flex;
@@ -119,7 +114,6 @@
       color: #555;
     }
 
-    /* 无日记提示 */
     .empty-tip {
       color: #bbb;
       font-size: 14px;
@@ -127,7 +121,7 @@
       margin-top: 30px;
     }
 
-    /* 编辑弹窗（简单对话框） */
+    /* 编辑弹窗 */
     .modal-mask {
       display: none;
       position: fixed;
@@ -190,12 +184,10 @@
       border: 1px solid #1a1a1a;
     }
 
-    /* 导入文件隐藏 */
     #importFile {
       display: none;
     }
 
-    /* 手机适配 */
     @media (max-width: 480px) {
       .header h1 {
         font-size: 24px;
@@ -212,14 +204,14 @@
     <h1>日·记</h1>
   </div>
 
-  <div class="actions">
+  <!-- 工具栏 – 截图时会临时隐藏 -->
+  <div class="actions" id="actionBar">
     <button id="addBtn">＋ 写日记</button>
     <button id="saveImgBtn">⬇ 保存为图片</button>
     <button id="exportBtn">↗ 导出数据</button>
     <button id="importBtn">↖ 导入数据</button>
   </div>
 
-  <!-- 时间线区域（截图时会截取这里） -->
   <div id="timeline" class="timeline"></div>
 
   <!-- 编辑弹窗 -->
@@ -236,16 +228,13 @@
     </div>
   </div>
 
-  <!-- 隐藏的文件选择器用于导入 -->
   <input type="file" id="importFile" accept=".json">
 
   <script>
     (function() {
-      // ---------- 数据存储 ----------
       const STORAGE_KEY = 'pure_diary_data';
       let diaries = [];
 
-      // 从 localStorage 加载
       function loadDiaries() {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
@@ -255,13 +244,11 @@
             diaries = [];
           }
         } else {
-          // 默认两条示例日记，方便你看到效果（日期使用完整日期）
           diaries = [
             { id: Date.now() - 200000, date: '2026-05-24', content: '开始用极简日记。' },
             { id: Date.now() - 100000, date: '2026-05-25', content: '今天阳光很好，在窗边看书。' }
           ];
         }
-        // 按日期降序排列（新的在上面）
         sortDiaries();
       }
 
@@ -273,15 +260,12 @@
         diaries.sort((a, b) => (a.date < b.date ? 1 : -1));
       }
 
-      // 生成唯一 id
       function generateId() {
         return Date.now() + Math.floor(Math.random() * 1000);
       }
 
-      // ---------- 渲染时间线 ----------
       const timelineEl = document.getElementById('timeline');
 
-      // 把完整日期 "YYYY-MM-DD" 转为展示格式 "M月D日" （删去年份）
       function formatDisplayDate(dateStr) {
         if (!dateStr) return '';
         const parts = dateStr.split('-');
@@ -313,7 +297,6 @@
         timelineEl.innerHTML = html;
       }
 
-      // 简单转义防止XSS
       function escapeHtml(text) {
         return String(text)
           .replace(/&/g, '&amp;')
@@ -323,13 +306,13 @@
           .replace(/'/g, '&#039;');
       }
 
-      // ---------- 编辑弹窗逻辑 ----------
+      // 弹窗
       const modal = document.getElementById('modal');
       const dateInput = document.getElementById('diaryDate');
       const contentInput = document.getElementById('diaryContent');
       const modalSave = document.getElementById('modalSave');
       const modalCancel = document.getElementById('modalCancel');
-      let currentEditId = null;   // null 表示新增模式
+      let currentEditId = null;
 
       function openModal(diary = null) {
         if (diary) {
@@ -338,7 +321,6 @@
           contentInput.value = diary.content;
         } else {
           currentEditId = null;
-          // 默认日期为今天
           const today = new Date();
           const yyyy = today.getFullYear();
           const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -358,24 +340,16 @@
       modalSave.addEventListener('click', function() {
         const date = dateInput.value.trim();
         const content = contentInput.value.trim();
-        if (!date) {
-          alert('请选择日期');
-          return;
-        }
-        if (!content) {
-          alert('请输入内容');
-          return;
-        }
+        if (!date) { alert('请选择日期'); return; }
+        if (!content) { alert('请输入内容'); return; }
 
         if (currentEditId !== null) {
-          // 编辑模式
           const idx = diaries.findIndex(d => d.id === currentEditId);
           if (idx !== -1) {
             diaries[idx].date = date;
             diaries[idx].content = content;
           }
         } else {
-          // 新增模式
           diaries.push({
             id: generateId(),
             date: date,
@@ -390,17 +364,14 @@
       });
 
       modalCancel.addEventListener('click', closeModal);
-      // 点击遮罩关闭
       modal.addEventListener('click', function(e) {
         if (e.target === modal) closeModal();
       });
 
-      // ---------- 绑定事件 ----------
       document.getElementById('addBtn').addEventListener('click', function() {
         openModal(null);
       });
 
-      // 用事件委托处理编辑、删除
       timelineEl.addEventListener('click', function(e) {
         const target = e.target;
         const id = Number(target.getAttribute('data-id'));
@@ -418,38 +389,45 @@
         }
       });
 
-      // ---------- 保存为图片 ----------
+      // ---------- 保存为图片（隐藏工具栏和编辑按钮）----------
       document.getElementById('saveImgBtn').addEventListener('click', function() {
-        const element = document.getElementById('timeline');
-        // 如果时间线为空，提示
         if (diaries.length === 0) {
           alert('还没有日记内容，无法保存图片');
           return;
         }
 
-        // 暂时隐藏空态提示（如果有）
-        html2canvas(element, {
+        const actionBar = document.getElementById('actionBar');
+        const toolBars = document.querySelectorAll('.entry-tools');
+
+        // 临时隐藏
+        actionBar.style.visibility = 'hidden';
+        toolBars.forEach(el => el.style.visibility = 'hidden');
+
+        html2canvas(document.body, {
           backgroundColor: '#ffffff',
-          scale: 2,   // 高清输出
+          scale: 2,
           useCORS: true
         }).then(canvas => {
-          // 触发下载
+          // 恢复可见
+          actionBar.style.visibility = '';
+          toolBars.forEach(el => el.style.visibility = '');
+
           const link = document.createElement('a');
           link.download = '日记_' + new Date().toISOString().slice(0,10) + '.png';
           link.href = canvas.toDataURL('image/png');
           link.click();
         }).catch(err => {
+          // 即使出错也要恢复
+          actionBar.style.visibility = '';
+          toolBars.forEach(el => el.style.visibility = '');
           alert('截图失败，请重试');
           console.error(err);
         });
       });
 
-      // ---------- 导出数据 ----------
+      // 导出
       document.getElementById('exportBtn').addEventListener('click', function() {
-        if (diaries.length === 0) {
-          alert('没有日记可以导出');
-          return;
-        }
+        if (diaries.length === 0) { alert('没有日记可以导出'); return; }
         const dataStr = JSON.stringify(diaries, null, 2);
         const blob = new Blob([dataStr], {type: 'application/json'});
         const url = URL.createObjectURL(blob);
@@ -460,7 +438,7 @@
         URL.revokeObjectURL(url);
       });
 
-      // ---------- 导入数据 ----------
+      // 导入
       const importFileInput = document.getElementById('importFile');
       document.getElementById('importBtn').addEventListener('click', function() {
         importFileInput.click();
@@ -472,10 +450,7 @@
         reader.onload = function(ev) {
           try {
             const imported = JSON.parse(ev.target.result);
-            if (!Array.isArray(imported)) {
-              throw new Error('格式错误');
-            }
-            // 简单验证一下结构
+            if (!Array.isArray(imported)) throw new Error('格式错误');
             for (let item of imported) {
               if (!item.id || !item.date || typeof item.content !== 'string') {
                 throw new Error('数据字段不完整');
@@ -492,18 +467,15 @@
           }
         };
         reader.readAsText(file);
-        // 清空input，允许重复选择同一文件
         importFileInput.value = '';
       });
 
-      // ---------- 键盘快捷键：Esc 关闭弹窗 ----------
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && modal.classList.contains('show')) {
           closeModal();
         }
       });
 
-      // ---------- 启动 ----------
       loadDiaries();
       renderTimeline();
     })();
