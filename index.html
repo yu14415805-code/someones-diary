@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日·记</title>
+  <!-- 引入 html2canvas 用于截图保存 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #fff;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+      color: #2c2c2c;
+      padding: 40px 20px 60px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* 顶部标题 */
+    .header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 400;
+      letter-spacing: 6px;
+      color: #1a1a1a;
+    }
+
+    /* 按钮区域 */
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+    .actions button {
+      background: #fff;
+      border: 1px solid #d4d4d4;
+      color: #3a3a3a;
+      padding: 8px 22px;
+      font-size: 14px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: 0.2s;
+      border-radius: 2px;
+    }
+    .actions button:hover {
+      background: #f7f7f7;
+      border-color: #aaa;
+    }
+
+    /* 时间线容器 */
+    .timeline {
+      position: relative;
+      padding-left: 30px;
+    }
+    /* 时间线中间的竖线 */
+    .timeline::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 10px;
+      width: 1px;
+      background: #e0e0e0;
+    }
+
+    /* 每条日记 */
+    .entry {
+      position: relative;
+      margin-bottom: 32px;
+      padding-left: 20px;
+    }
+    /* 时间线上的圆点 */
+    .entry::before {
+      content: "";
+      position: absolute;
+      left: -20px;
+      top: 6px;
+      width: 8px;
+      height: 8px;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 50%;
+    }
+    .entry-date {
+      font-size: 13px;
+      color: #888;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+    .entry-content {
+      font-size: 16px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .entry-tools {
+      margin-top: 6px;
+      display: flex;
+      gap: 14px;
+    }
+    .entry-tools span {
+      font-size: 12px;
+      color: #aaa;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .entry-tools span:hover {
+      color: #555;
+    }
+
+    /* 无日记提示 */
+    .empty-tip {
+      color: #bbb;
+      font-size: 14px;
+      text-align: center;
+      margin-top: 30px;
+    }
+
+    /* 编辑弹窗（简单对话框） */
+    .modal-mask {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.2);
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 18vh;
+      z-index: 10;
+    }
+    .modal-mask.show {
+      display: flex;
+    }
+    .modal-card {
+      background: #fff;
+      width: 90%;
+      max-width: 420px;
+      padding: 30px 28px 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      border-radius: 4px;
+    }
+    .modal-card label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+    .modal-card input,
+    .modal-card textarea {
+      width: 100%;
+      border: 1px solid #ddd;
+      padding: 10px 12px;
+      font-size: 15px;
+      margin-bottom: 18px;
+      border-radius: 3px;
+      font-family: inherit;
+      resize: vertical;
+    }
+    .modal-card textarea {
+      min-height: 120px;
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+    .modal-buttons button {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 8px 20px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+    .modal-buttons button.primary {
+      background: #1a1a1a;
+      color: #fff;
+      border: 1px solid #1a1a1a;
+    }
+
+    /* 导入文件隐藏 */
+    #importFile {
+      display: none;
+    }
+
+    /* 手机适配 */
+    @media (max-width: 480px) {
+      .header h1 {
+        font-size: 24px;
+        letter-spacing: 4px;
+      }
+      .entry-content {
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>日·记</h1>
+  </div>
+
+  <div class="actions">
+    <button id="addBtn">＋ 写日记</button>
+    <button id="saveImgBtn">⬇ 保存为图片</button>
+    <button id="exportBtn">↗ 导出数据</button>
+    <button id="importBtn">↖ 导入数据</button>
+  </div>
+
+  <!-- 时间线区域（截图时会截取这里） -->
+  <div id="timeline" class="timeline"></div>
+
+  <!-- 编辑弹窗 -->
+  <div id="modal" class="modal-mask">
+    <div class="modal-card">
+      <label for="diaryDate">日期</label>
+      <input type="date" id="diaryDate">
+      <label for="diaryContent">内容</label>
+      <textarea id="diaryContent" placeholder="写点什么..."></textarea>
+      <div class="modal-buttons">
+        <button id="modalCancel">取消</button>
+        <button id="modalSave" class="primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 隐藏的文件选择器用于导入 -->
+  <input type="file" id="importFile" accept=".json">
+
+  <script>
+    (function() {
+      // ---------- 数据存储 ----------
+      const STORAGE_KEY = 'pure_diary_data';
+      let diaries = [];
+
+      // 从 localStorage 加载
+      function loadDiaries() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            diaries = JSON.parse(stored);
+          } catch(e) {
+            diaries = [];
+          }
+        } else {
+          // 默认两条示例日记，方便你看到效果（日期使用完整日期）
+          diaries = [
+            { id: Date.now() - 200000, date: '2026-05-24', content: '开始用极简日记。' },
+            { id: Date.now() - 100000, date: '2026-05-25', content: '今天阳光很好，在窗边看书。' }
+          ];
+        }
+        // 按日期降序排列（新的在上面）
+        sortDiaries();
+      }
+
+      function saveDiaries() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(diaries));
+      }
+
+      function sortDiaries() {
+        diaries.sort((a, b) => (a.date < b.date ? 1 : -1));
+      }
+
+      // 生成唯一 id
+      function generateId() {
+        return Date.now() + Math.floor(Math.random() * 1000);
+      }
+
+      // ---------- 渲染时间线 ----------
+      const timelineEl = document.getElementById('timeline');
+
+      // 把完整日期 "YYYY-MM-DD" 转为展示格式 "M月D日" （删去年份）
+      function formatDisplayDate(dateStr) {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return dateStr;
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        return month + '月' + day + '日';
+      }
+
+      function renderTimeline() {
+        if (diaries.length === 0) {
+          timelineEl.innerHTML = '<div class="empty-tip">还没有日记，点击「写日记」开始吧</div>';
+          return;
+        }
+
+        let html = '';
+        diaries.forEach(diary => {
+          html += `
+            <div class="entry" data-id="${diary.id}">
+              <div class="entry-date">${formatDisplayDate(diary.date)}</div>
+              <div class="entry-content">${escapeHtml(diary.content)}</div>
+              <div class="entry-tools">
+                <span class="edit-action" data-id="${diary.id}">编辑</span>
+                <span class="delete-action" data-id="${diary.id}">删除</span>
+              </div>
+            </div>
+          `;
+        });
+        timelineEl.innerHTML = html;
+      }
+
+      // 简单转义防止XSS
+      function escapeHtml(text) {
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      // ---------- 编辑弹窗逻辑 ----------
+      const modal = document.getElementById('modal');
+      const dateInput = document.getElementById('diaryDate');
+      const contentInput = document.getElementById('diaryContent');
+      const modalSave = document.getElementById('modalSave');
+      const modalCancel = document.getElementById('modalCancel');
+      let currentEditId = null;   // null 表示新增模式
+
+      function openModal(diary = null) {
+        if (diary) {
+          currentEditId = diary.id;
+          dateInput.value = diary.date;
+          contentInput.value = diary.content;
+        } else {
+          currentEditId = null;
+          // 默认日期为今天
+          const today = new Date();
+          const yyyy = today.getFullYear();
+          const mm = String(today.getMonth() + 1).padStart(2, '0');
+          const dd = String(today.getDate()).padStart(2, '0');
+          dateInput.value = `${yyyy}-${mm}-${dd}`;
+          contentInput.value = '';
+        }
+        modal.classList.add('show');
+        contentInput.focus();
+      }
+
+      function closeModal() {
+        modal.classList.remove('show');
+        currentEditId = null;
+      }
+
+      modalSave.addEventListener('click', function() {
+        const date = dateInput.value.trim();
+        const content = contentInput.value.trim();
+        if (!date) {
+          alert('请选择日期');
+          return;
+        }
+        if (!content) {
+          alert('请输入内容');
+          return;
+        }
+
+        if (currentEditId !== null) {
+          // 编辑模式
+          const idx = diaries.findIndex(d => d.id === currentEditId);
+          if (idx !== -1) {
+            diaries[idx].date = date;
+            diaries[idx].content = content;
+          }
+        } else {
+          // 新增模式
+          diaries.push({
+            id: generateId(),
+            date: date,
+            content: content
+          });
+        }
+
+        sortDiaries();
+        saveDiaries();
+        renderTimeline();
+        closeModal();
+      });
+
+      modalCancel.addEventListener('click', closeModal);
+      // 点击遮罩关闭
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeModal();
+      });
+
+      // ---------- 绑定事件 ----------
+      document.getElementById('addBtn').addEventListener('click', function() {
+        openModal(null);
+      });
+
+      // 用事件委托处理编辑、删除
+      timelineEl.addEventListener('click', function(e) {
+        const target = e.target;
+        const id = Number(target.getAttribute('data-id'));
+        if (!id) return;
+
+        if (target.classList.contains('edit-action')) {
+          const diary = diaries.find(d => d.id === id);
+          if (diary) openModal(diary);
+        } else if (target.classList.contains('delete-action')) {
+          if (confirm('确定删除这条日记吗？')) {
+            diaries = diaries.filter(d => d.id !== id);
+            saveDiaries();
+            renderTimeline();
+          }
+        }
+      });
+
+      // ---------- 保存为图片 ----------
+      document.getElementById('saveImgBtn').addEventListener('click', function() {
+        const element = document.getElementById('timeline');
+        // 如果时间线为空，提示
+        if (diaries.length === 0) {
+          alert('还没有日记内容，无法保存图片');
+          return;
+        }
+
+        // 暂时隐藏空态提示（如果有）
+        html2canvas(element, {
+          backgroundColor: '#ffffff',
+          scale: 2,   // 高清输出
+          useCORS: true
+        }).then(canvas => {
+          // 触发下载
+          const link = document.createElement('a');
+          link.download = '日记_' + new Date().toISOString().slice(0,10) + '.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        }).catch(err => {
+          alert('截图失败，请重试');
+          console.error(err);
+        });
+      });
+
+      // ---------- 导出数据 ----------
+      document.getElementById('exportBtn').addEventListener('click', function() {
+        if (diaries.length === 0) {
+          alert('没有日记可以导出');
+          return;
+        }
+        const dataStr = JSON.stringify(diaries, null, 2);
+        const blob = new Blob([dataStr], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = '日记备份_' + new Date().toISOString().slice(0,10) + '.json';
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // ---------- 导入数据 ----------
+      const importFileInput = document.getElementById('importFile');
+      document.getElementById('importBtn').addEventListener('click', function() {
+        importFileInput.click();
+      });
+      importFileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          try {
+            const imported = JSON.parse(ev.target.result);
+            if (!Array.isArray(imported)) {
+              throw new Error('格式错误');
+            }
+            // 简单验证一下结构
+            for (let item of imported) {
+              if (!item.id || !item.date || typeof item.content !== 'string') {
+                throw new Error('数据字段不完整');
+              }
+            }
+            if (!confirm('导入将会覆盖当前所有日记，确定继续吗？')) return;
+            diaries = imported;
+            sortDiaries();
+            saveDiaries();
+            renderTimeline();
+            alert('导入成功！');
+          } catch (error) {
+            alert('文件格式不正确，请导入之前导出的 .json 文件');
+          }
+        };
+        reader.readAsText(file);
+        // 清空input，允许重复选择同一文件
+        importFileInput.value = '';
+      });
+
+      // ---------- 键盘快捷键：Esc 关闭弹窗 ----------
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.classList.contains('show')) {
+          closeModal();
+        }
+      });
+
+      // ---------- 启动 ----------
+      loadDiaries();
+      renderTimeline();
+    })();
+  </script>
+</body>
+</html>
